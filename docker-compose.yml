@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:19
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-winestore}
+      POSTGRES_USER: ${POSTGRES_USER:-winestore}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-winestore}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U winestore -d winestore"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-winestore}
+      DB_USER: ${POSTGRES_USER:-winestore}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-winestore}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-dev-only-secret-change-me}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
